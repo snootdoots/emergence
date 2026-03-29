@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emergence — Systems Playground</title>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="emergence.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">Emergence <em>— freeform systems playground</em></div>
+  <div class="header-right">
+    <div class="stat-pill" id="hAgents">0 agents</div>
+    <div class="stat-pill" id="hTick">tick 0</div>
+    <div class="stat-pill" id="hStatus">paused</div>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div class="panel-left">
+    <div class="p-section">
+      <div class="p-label">Agent Types</div>
+      <div class="agent-cards" id="agentCards"></div>
+      <button class="add-type-btn" onclick="openModal()">+ add type</button>
+    </div>
+
+    <div class="p-section">
+      <div class="p-label">Spawn Selected</div>
+      <div class="slider-row">
+        <span class="slider-lbl">count</span>
+        <input type="range" min="1" max="80" value="20" id="spawnN"
+          oninput="document.getElementById('spawnNv').textContent=this.value">
+        <span class="slider-val" id="spawnNv">20</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ink" onclick="doSpawn()">Spawn</button>
+        <button class="btn btn-outline" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+
+    <div class="p-section">
+      <div class="p-label">Simulation</div>
+      <div class="slider-row">
+        <span class="slider-lbl">speed</span>
+        <input type="range" min="1" max="10" value="5" id="simSpd"
+          oninput="document.getElementById('simSpdV').textContent=this.value">
+        <span class="slider-val" id="simSpdV">5</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-lbl">wander</span>
+        <input type="range" min="0" max="10" value="4" id="wanderR"
+          oninput="document.getElementById('wanderV').textContent=this.value">
+        <span class="slider-val" id="wanderV">4</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-ink" id="playBtn" onclick="togglePlay()">▶ Play</button>
+        <button class="btn btn-red" onclick="hardReset()">Reset</button>
+      </div>
+    </div>
+
+    <div class="p-section" style="border-bottom:none;flex:1">
+      <div class="p-label">Population</div>
+      <div id="popTable"></div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap">
+    <canvas id="simCanvas"></canvas>
+    <div class="hud">
+      <div class="hud-pill" id="tickHud">TICK 0</div>
+      <div class="hud-pill" id="runHud">PAUSED</div>
+    </div>
+    <div class="canvas-hint">click canvas to place selected agent type</div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel-right">
+    <div class="rule-builder">
+      <div class="p-label" style="margin-bottom:12px">Rule Builder</div>
+      <div class="rule-form">
+
+        <!-- Row 1: type -->
+        <div class="rule-row">
+          <span class="rule-connector">When</span>
+          <select id="rb_typeA" onchange="updatePreview()"></select>
+          <select id="rb_verb" onchange="rbVerbChanged()">
+            <option value="infection">infects</option>
+            <option value="attraction">attracts</option>
+            <option value="repulsion">repels</option>
+            <option value="transition">transitions to</option>
+            <option value="death_time">dies after time</option>
+            <option value="death_contact">is killed by</option>
+            <option value="kill_spawn">kills and spawns</option>
+            <option value="reproduction">reproduces</option>
+          </select>
+          <select id="rb_typeB" onchange="updatePreview()"></select>
+          <select id="rb_typeC" onchange="updatePreview()" style="display:none"></select>
+        </div>
+
+        <!-- Dynamic params -->
+        <div class="param-group" id="rb_params"></div>
+
+        <!-- Preview sentence -->
+        <div class="rule-preview" id="rb_preview">—</div>
+
+        <button class="btn btn-ink" onclick="commitRule()" style="align-self:flex-end">+ Add Rule</button>
+      </div>
+    </div>
+
+    <div style="padding:10px 16px 6px; border-bottom:1px solid var(--border); flex-shrink:0;">
+      <div class="p-label">Active Rules</div>
+    </div>
+    <div class="rules-scroll" id="rulesScroll">
+      <div class="rules-empty">No rules yet.<br>Build one above.</div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="p-label" style="margin-bottom:6px">Population over time</div>
+      <canvas class="chart-canvas-el" id="chartEl"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- Add Agent Modal -->
+<div class="modal-bg" id="agentModal">
+  <div class="modal">
+    <div class="modal-title">New Agent Type</div>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="newName" placeholder="e.g. Infected, Healthy, Wolf...">
+    </div>
+    <div class="field">
+      <label>Emoji</label>
+      <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-ink" onclick="confirmAgent()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script src="emergence.js"></script>
+</body>
+</html>
