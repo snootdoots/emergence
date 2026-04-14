@@ -23,6 +23,15 @@
   <!-- LEFT -->
   <div class="panel-left">
     <div class="p-section">
+      <div class="p-label">Presets</div>
+      <div class="btn-row" style="flex-wrap: wrap;">
+        <button class="btn btn-outline" onclick="loadPreset('forest_fire')" style="flex:1">Forest Fire</button>
+        <button class="btn btn-outline" onclick="loadPreset('viral')" style="flex:1">Viral</button>
+        <button class="btn btn-outline" onclick="loadPreset('predator_prey')" style="flex:1">Fox & Rabbit</button>
+      </div>
+    </div>
+
+    <div class="p-section">
       <div class="p-label">Agent Types</div>
       <div class="agent-cards" id="agentCards"></div>
       <button class="add-type-btn" onclick="openModal()">+ add type</button>

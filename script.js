@@ -92,6 +92,40 @@ function step() {
           }
         }
       }
+      if (rule.verb === 'chain_infection') {
+        if (a.type !== rule.typeA) continue;
+        let closest = null;
+        let closestD2 = rule.radius**2;
+        for (let j = 0; j < agents.length; j++) {
+          if (i === j) continue;
+          const b = agents[j];
+          if (b.type !== rule.typeB) continue;
+          const d2 = (b.x-a.x)**2 + (b.y-a.y)**2;
+          if (d2 < closestD2) {
+            closest = b;
+            closestD2 = d2;
+          }
+        }
+        if (closest && Math.random() < rule.prob) {
+          const t = agentTypes.find(t => t.name === rule.typeA);
+          closest.type = rule.typeA; if (t) closest.emoji = t.emoji; closest.age = 0;
+        }
+      }
+      if (rule.verb === 'neighborhood_transition') {
+        if (a.type !== rule.typeA) continue;
+        let count = 0;
+        for (let j = 0; j < agents.length; j++) {
+          if (i === j) continue;
+          const b = agents[j];
+          if (b.type !== rule.typeB) continue;
+          const d2 = (b.x-a.x)**2 + (b.y-a.y)**2;
+          if (d2 < rule.radius**2) count++;
+        }
+        if (count >= rule.minCount && count <= rule.maxCount) {
+          const t = agentTypes.find(t => t.name === rule.typeC);
+          if (t) { a.type = rule.typeC; a.emoji = t.emoji; a.age = 0; }
+        }
+      }
       if (rule.verb === 'attraction') {
         if (a.type !== rule.typeA) continue;
         for (let j = 0; j < agents.length; j++) {
@@ -254,6 +288,7 @@ function updateHud() {
   document.getElementById('tickHud').textContent = `TICK ${tick}`;
   document.getElementById('hTick').textContent = `tick ${tick}`;
   document.getElementById('hAgents').textContent = `${agents.length} agents`;
+  refreshLiveStats();
 }
 
 // ─── Left panel ───────────────────────────────────────────
@@ -268,7 +303,7 @@ function refreshLeft() {
         <span class="agent-em">${t.emoji}</span>
         <div class="agent-meta">
           <div class="agent-name-text">${t.name}</div>
-          <div class="agent-ct">${agents.filter(a=>a.type===t.name).length} alive</div>
+          <div class="agent-ct" id="acount-${i}">0 alive</div>
         </div>
         <div class="agent-swatch" style="background:${t.color}"></div>
         <button class="agent-del" onclick="event.stopPropagation();deleteType(${i})">✕</button>
@@ -276,20 +311,45 @@ function refreshLeft() {
     `).join('');
   }
 
-  // Pop table
-  const pt = document.getElementById('popTable');
-  if (!agents.length) { pt.innerHTML = '<div style="font-size:0.62rem;color:var(--muted)">No agents</div>'; return; }
+  // Clear pop table so our live stats resyncs correctly
+  document.getElementById('popTable').innerHTML = '';
+  refreshLiveStats();
+}
+
+function refreshLiveStats() {
+  if (!agentTypes.length) return;
   const counts = {};
   for (const a of agents) counts[a.type] = (counts[a.type]||0)+1;
-  const max = Math.max(...Object.values(counts));
-  pt.innerHTML = Object.entries(counts).map(([k,v]) => {
-    const t = agentTypes.find(t=>t.name===k);
-    return `<div class="pop-row">
-      <span style="font-size:0.7rem">${t?t.emoji:'?'}</span>
-      <div class="pop-bar-wrap"><div class="pop-bar" style="width:${(v/max*100).toFixed(1)}%;background:${t?t.color:'#888'}"></div></div>
-      <span>${v}</span>
-    </div>`;
-  }).join('');
+  const max = Math.max(1, ...Object.values(counts));
+  
+  for (let i = 0; i < agentTypes.length; i++) {
+    const el = document.getElementById(`acount-${i}`);
+    if (el) el.textContent = `${counts[agentTypes[i].name]||0} alive`;
+  }
+  
+  const pt = document.getElementById('popTable');
+  if (!agents.length) { 
+    pt.innerHTML = '<div style="font-size:0.62rem;color:var(--muted)">No agents</div>'; 
+    return;
+  }
+  if (pt.innerHTML.includes('No agents') || pt.children.length !== agentTypes.length) {
+    pt.innerHTML = agentTypes.map((t, i) => {
+      const v = counts[t.name]||0;
+      return `<div class="pop-row">
+        <span style="font-size:0.7rem">${t.emoji}</span>
+        <div class="pop-bar-wrap"><div class="pop-bar" id="popbar-${i}" style="width:${(v/max*100).toFixed(1)}%;background:${t.color}"></div></div>
+        <span id="popval-${i}">${v}</span>
+      </div>`;
+    }).join('');
+  } else {
+    for (let i = 0; i < agentTypes.length; i++) {
+       const v = counts[agentTypes[i].name]||0;
+       const bar = document.getElementById(`popbar-${i}`);
+       const val = document.getElementById(`popval-${i}`);
+       if (bar) bar.style.width = `${(v/max*100).toFixed(1)}%`;
+       if (val) val.textContent = v;
+    }
+  }
 }
 
 function selectType(i) { selectedType = i; refreshLeft(); }
@@ -354,6 +414,8 @@ document.getElementById('newName').addEventListener('keydown', e => { if (e.key 
 // ─── Rule Builder ─────────────────────────────────────────
 const VERB_INFO = {
   infection:    { hasB: true,  params: ['radius:Radius:10:60:22','prob:Probability:1:100:5:0.01:%'] },
+  chain_infection:{ hasB: true, params: ['radius:Radius:10:60:22','prob:Probability:1:100:5:0.01:%'] },
+  neighborhood_transition: { hasB: true, hasC: true, params: ['radius:Radius:10:60:22','minCount:Min Neighbors:0:20:3','maxCount:Max Neighbors:0:20:5'] },
   attraction:   { hasB: true,  params: ['range:Range:20:300:150','strength:Strength:1:20:8:0.01'] },
   repulsion:    { hasB: true,  params: ['range:Range:20:300:120','strength:Strength:1:20:10:0.01'] },
   transition:   { hasB: true,  params: ['afterTicks:After (ticks):20:1000:300'] },
@@ -364,7 +426,7 @@ const VERB_INFO = {
 };
 
 const VERB_LABELS = {
-  infection:'infects', attraction:'attracts', repulsion:'repels',
+  infection:'infects', chain_infection:'infects closest', neighborhood_transition:'changes if near', attraction:'attracts', repulsion:'repels',
   transition:'transitions to', death_time:'dies after time',
   death_contact:'is killed by', kill_spawn:'kills and spawns', reproduction:'reproduces'
 };
@@ -425,6 +487,8 @@ function updatePreview() {
 
   const sentences = {
     infection: `${emA} ${a} spreads to ${emB} ${b} within radius ${p.radius?.toFixed(0)}, chance ${(p.prob*100).toFixed(0)}%`,
+    chain_infection: `${emA} ${a} spreads ONLY to closest ${emB} ${b} within radius ${p.radius?.toFixed(0)}, chance ${(p.prob*100).toFixed(0)}%`,
+    neighborhood_transition: `${emA} ${a} becomes ${emC} ${c} if ${p.minCount} - ${p.maxCount} ${emB} ${b} are within radius ${p.radius?.toFixed(0)}`,
     attraction: `${emA} ${a} moves toward ${emB} ${b} within range ${p.range?.toFixed(0)}`,
     repulsion: `${emA} ${a} flees from ${emB} ${b} within range ${p.range?.toFixed(0)}`,
     transition: `${emA} ${a} becomes ${emB} ${b} after ${p.afterTicks?.toFixed(0)} ticks`,
@@ -452,7 +516,7 @@ function renderRules() {
   const el = document.getElementById('rulesScroll');
   if (!rules.length) { el.innerHTML = '<div class="rules-empty">No rules yet.<br>Build one above.</div>'; return; }
 
-  const verbColor = { infection:'infection', attraction:'attraction', repulsion:'repulsion',
+  const verbColor = { infection:'infection', chain_infection:'infection', neighborhood_transition:'transition', attraction:'attraction', repulsion:'repulsion',
     transition:'transition', death_time:'death', death_contact:'death', kill_spawn:'death', reproduction:'reproduction' };
 
   el.innerHTML = rules.map((r,i) => `
@@ -466,6 +530,74 @@ function renderRules() {
 
 function deleteRule(i) { rules.splice(i,1); renderRules(); }
 
+// ─── Preset Handlers ──────────────────────────────────────
+function loadPreset(id) {
+  hardReset();
+
+  document.getElementById('simSpd').value = 5;
+  document.getElementById('simSpdV').textContent = '5';
+  document.getElementById('wanderR').value = 4;
+  document.getElementById('wanderV').textContent = '4';
+
+  if (id === 'forest_fire') {
+    agentTypes = [
+      { name: 'Tree', emoji: '🌲', color: SWATCHES[2] },
+      { name: 'Fire', emoji: '🔥', color: SWATCHES[0] },
+      { name: 'Ash', emoji: '💀', color: SWATCHES[5] }
+    ];
+    rules = [
+      { verb: 'infection', typeA: 'Fire', typeB: 'Tree', prob: 0.03, radius: 25, _preview: '🔥 Fire spreads to 🌲 Tree within radius 25, chance 3%' },
+      { verb: 'transition', typeA: 'Fire', typeB: 'Ash', afterTicks: 120, _preview: '🔥 Fire becomes 💀 Ash after 120 ticks' },
+      { verb: 'transition', typeA: 'Ash', typeB: 'Tree', afterTicks: 600, _preview: '💀 Ash becomes 🌲 Tree after 600 ticks' }
+    ];
+    for(let i=0; i<600; i++) spawnOne(agentTypes[0], 50+Math.random()*(canvas.width-100), 50+Math.random()*(canvas.height-100));
+    for(let i=0; i<3; i++) spawnOne(agentTypes[1], canvas.width/2 + (Math.random()-.5)*20, canvas.height/2 + (Math.random()-.5)*20);
+  }
+  else if (id === 'viral') {
+    agentTypes = [
+      { name: 'Healthy', emoji: '😊', color: SWATCHES[1] },
+      { name: 'Sick', emoji: '🦠', color: SWATCHES[0] },
+      { name: 'Immune', emoji: '🛡️', color: SWATCHES[8] },
+      { name: 'Dead', emoji: '💀', color: SWATCHES[7] }
+    ];
+    rules = [
+      { verb: 'infection', typeA: 'Sick', typeB: 'Healthy', prob: 0.04, radius: 30, _preview: '🦠 Sick spreads to 😊 Healthy within radius 30, chance 4%' },
+      { verb: 'transition', typeA: 'Sick', typeB: 'Immune', afterTicks: 250, _preview: '🦠 Sick becomes 🛡️ Immune after 250 ticks' },
+      { verb: 'death_time', typeA: 'Sick', afterTicks: 500, _preview: '🦠 Sick dies after ~200 ticks' },
+      { verb: 'transition', typeA: 'Immune', typeB: 'Healthy', afterTicks: 800, _preview: '🛡️ Immune becomes 😊 Healthy after 800 ticks' },
+      { verb: 'repulsion', typeA: 'Healthy', typeB: 'Sick', range: 50, strength: 0.01, _preview: '😊 Healthy flees from 🦠 Sick within range 80' }
+    ];
+    for(let i=0; i<450; i++) spawnOne(agentTypes[0], 50+Math.random()*(canvas.width-100), 50+Math.random()*(canvas.height-100));
+    for(let i=0; i<8; i++) spawnOne(agentTypes[1], 50+Math.random()*(canvas.width-100), 50+Math.random()*(canvas.height-100));
+  }
+  else if (id === 'predator_prey') {
+    agentTypes = [
+      { name: 'Rabbit', emoji: '🐰', color: SWATCHES[1] },
+      { name: 'Fox', emoji: '🦊', color: SWATCHES[3] }
+    ];
+    rules = [
+      { verb: 'reproduction', typeA: 'Rabbit', rate: 0.005, _preview: '🐰 Rabbit spontaneously reproduces (rate ≈5.0‰/tick)' },
+      { verb: 'kill_spawn', typeA: 'Fox', typeB: 'Rabbit', typeC: 'Fox', prob: 1.0, radius: 20, _preview: '🦊 Fox kills 🐰 Rabbit and spawns 🦊 Fox on contact' },
+      { verb: 'death_time', typeA: 'Fox', afterTicks: 500, _preview: '🦊 Fox dies after ~500 ticks' },
+      { verb: 'attraction', typeA: 'Fox', typeB: 'Rabbit', range: 300, strength: 0.05, _preview: '🦊 Fox moves toward 🐰 Rabbit within range 300' },
+      { verb: 'repulsion', typeA: 'Rabbit', typeB: 'Fox', range: 120, strength: 0.02, _preview: '🐰 Rabbit flees from 🦊 Fox within range 120' }
+    ];
+    for(let i=0; i<150; i++) spawnOne(agentTypes[0], 50+Math.random()*(canvas.width-100), 50+Math.random()*(canvas.height-100));
+    for(let i=0; i<10; i++) spawnOne(agentTypes[1], 50+Math.random()*(canvas.width-100), 50+Math.random()*(canvas.height-100));
+  }
+
+  selectedType = 0;
+  refreshLeft();
+  refreshRuleBuilder();
+  renderRules();
+  draw();
+  drawChart();
+  
+  if (!running) {
+    togglePlay();
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────
 agentTypes.push({ name: 'Healthy', emoji: EMOJIS[0], color: SWATCHES[0] });
 selectedType = 0;
@@ -474,4 +606,3 @@ refreshLeft();
 refreshRuleBuilder();
 draw();
 
-// Done
